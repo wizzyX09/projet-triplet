@@ -6,9 +6,7 @@ import ht.kreyola.kreyolaparser.model.SentenceStatus;
 import ht.kreyola.kreyolaparser.model.Tag;
 import ht.kreyola.kreyolaparser.model.Triplet;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import static org.springframework.util.StringUtils.isEmpty;
 
@@ -38,8 +36,9 @@ public class BaseEmiter implements TripletEmiter {
         return null;
     }
 
-    private String verb(RichSentence richSentence) {
+    private List<String> verb(RichSentence richSentence) {
         String verb = "";
+        List<String> verbs = new ArrayList<>();
         int firstVerbIndex = 0;
         for (int i = 0; i < richSentence.getTaggedWords().size(); i++) {
             TaggedWord taggedWord = richSentence.getTaggedWords().get(i);
@@ -49,47 +48,104 @@ public class BaseEmiter implements TripletEmiter {
                 break;
             }
         }
-       if(firstVerbIndex + 1 < richSentence.getTaggedWords().size()) {
-           if(richSentence.getTaggedWords().get(firstVerbIndex+1).tag().equals(Tag.V.name())) {
-               return verb.concat(richSentence.getTaggedWords().get(firstVerbIndex+1).word());
-           }
-       }
-        if(firstVerbIndex + 2 < richSentence.getTaggedWords().size()) {
-            if(richSentence.getTaggedWords().get(firstVerbIndex+2).tag().equals(Tag.V.name())) {
-                return verb.concat(richSentence.getTaggedWords().get(firstVerbIndex+2).word());
-            }
-        }
-       return verb;
+
+        verbHelper(verb, verbs,firstVerbIndex, richSentence);
+        return verbs;
     }
 
-    private String complement(RichSentence richSentence) {
+    private String verbInfHelper(String verbInf){
+        String verb;
+        int verbInfLength = verbInf.length();
+        if(verbInf.substring(verbInfLength - 3).equalsIgnoreCase("yer")){
+            verb = verbInf.substring(0, verbInfLength - 3).concat("ie");
+        }else  if(verbInf.substring(verbInfLength - 2).equalsIgnoreCase("ir")){
+            verb = verbInf.substring(0, verbInfLength - 1).concat("t");
+        } else if(verbInf.substring(verbInfLength - 2).equalsIgnoreCase("re")){
+            verb = verbInf.substring(0, verbInfLength - 2);
+        } else if(verbInf.substring(verbInfLength - 2).equalsIgnoreCase("er")){
+            verb = verbInf.substring(0, verbInfLength - 1);
+        } else{
+            verb = verbInf;
+         }
+        return verb;
+
+    }
+
+    private List<String> verbHelper(String verb, List<String> verbs, int firstVerbIndex, RichSentence richSentence){
+        int firstIndex = firstVerbIndex + 1;
+        int nextIndex = firstVerbIndex + 2;
+        if(firstIndex < richSentence.getTaggedWords().size()) {
+            String tag = richSentence.getTaggedWords().get(firstIndex).tag();
+            if(tag.equals(Tag.V.name()) || tag.equals(Tag.VINF.name()) || tag.equals(Tag.VPP.name())) {
+                verb = verbInfHelper(richSentence.getTaggedWords().get(firstIndex).word());
+            }else if(tag.equals(Tag.CC.name()) && !verb.isEmpty()) {
+                verbs.add(verb);
+                verb = "";
+                verbHelper(verb, verbs, firstIndex, richSentence);
+                nextIndex++;
+            }
+        }
+        if(nextIndex < richSentence.getTaggedWords().size()) {
+            String tag = richSentence.getTaggedWords().get(nextIndex).tag();
+            if(tag.equals(Tag.V.name()) || tag.equals(Tag.VINF.name()) || tag.equals(Tag.VPP.name())){
+                verb = verbInfHelper(richSentence.getTaggedWords().get(nextIndex).word());
+            }else if(tag.equals(Tag.CC.name()) && !verb.isEmpty()) {
+                verbs.add(verb);
+                verb = "";
+                verbHelper(verb, verbs, nextIndex, richSentence);
+            }
+        }
+
+        if(!verb.isEmpty()) verbs.add(verb);
+
+        return verbs;
+    }
+
+    private List<String> complement(RichSentence richSentence) {
         boolean verbFound = false;
+        List<String> complements = new ArrayList<>();
         List<String> nouns = new ArrayList<>();
         for (TaggedWord taggedWord : richSentence.getTaggedWords()) {
             if (Tag.V.name().equals(taggedWord.tag()))
                 verbFound = true;
             if (verbFound && taggedWord.tag().equals(Tag.NC.name()))
                 nouns.add(taggedWord.word());
+            if (Tag.CC.name().equals(taggedWord.tag()) && !nouns.isEmpty()){
+                complements.add(String.join(" ", nouns));
+                nouns.clear();
+            }
         }
-        return String.join(" ", nouns);
+
+        complements.add(String.join(" ", nouns));
+        return complements;
     }
 
     @Override
     public List<Triplet> emit(RichSentence richSentence) {
         String subject = subject(richSentence);
-        String verb = verb(richSentence);
-        String complement = complement(richSentence);
-        if (!isEmpty(subject) && !isEmpty(verb) && !isEmpty(complement)) {
+        List<String> verbs = verb(richSentence);
+        List<String> complements = complement(richSentence);
+        List<Triplet> results = new ArrayList<>();
+        if (!isEmpty(subject) && !verbs.isEmpty() && !complements.isEmpty()) {
             richSentence.setStatus(SentenceStatus.PROCESSED);
-            return Collections.singletonList(new Triplet(subject, verb, complement));
+           for (String verb : verbs) {
+               results.add(new Triplet(subject, verb, complements.get(0)));
+           }
+           if (complements.size() > 1){
+               for (String verb : verbs) {
+                   results.add(new Triplet(subject, verb, complements.get(1)));
+               }
+           }
+
+            return results;
         }
         return Collections.emptyList();
     }
 
     // TODO
-    // et TOUSSAINT
-    // plusieurs verbes dans une phrase Wislet
-    // taille fonctionnelle (nombre de triplet) Toussaint
+    // et/ou TOUSSAINT done.
+    // plusieurs verbes dans une phrase Toussaint done.
+    // taille fonctionnelle (nombre de triplet) Toussaint done.
     // entree/sortie lecture/ecriture Wislet
-    // identifie les phrases incorrectes Toussaint ou Wislet
+    // identifie les phrases incorrectes Wislet
 }

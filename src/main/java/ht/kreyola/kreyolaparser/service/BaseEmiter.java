@@ -75,10 +75,11 @@ public class BaseEmiter implements TripletEmiter {
         int firstIndex = firstVerbIndex + 1;
         int nextIndex = firstVerbIndex + 2;
         if(firstIndex < richSentence.getTaggedWords().size()) {
-            String tag = richSentence.getTaggedWords().get(firstIndex).tag();
+            TaggedWord taggedWord = richSentence.getTaggedWords().get(firstIndex);
+            String tag = taggedWord.tag();
             if(tag.equals(Tag.V.name()) || tag.equals(Tag.VINF.name()) || tag.equals(Tag.VPP.name())) {
                 verb = verbInfHelper(richSentence.getTaggedWords().get(firstIndex).word());
-            }else if(tag.equals(Tag.CC.name()) && !verb.isEmpty()) {
+            }else if(punc_cc_Helper(taggedWord) && !verb.isEmpty()) {
                 verbs.add(verb);
                 verb = "";
                 verbHelper(verb, verbs, firstIndex, richSentence);
@@ -86,10 +87,11 @@ public class BaseEmiter implements TripletEmiter {
             }
         }
         if(nextIndex < richSentence.getTaggedWords().size()) {
-            String tag = richSentence.getTaggedWords().get(nextIndex).tag();
+            TaggedWord taggedWord = richSentence.getTaggedWords().get(nextIndex);
+            String tag = taggedWord.tag();
             if(tag.equals(Tag.V.name()) || tag.equals(Tag.VINF.name()) || tag.equals(Tag.VPP.name())){
                 verb = verbInfHelper(richSentence.getTaggedWords().get(nextIndex).word());
-            }else if(tag.equals(Tag.CC.name()) && !verb.isEmpty()) {
+            }else if(punc_cc_Helper(taggedWord) && !verb.isEmpty()) {
                 verbs.add(verb);
                 verb = "";
                 verbHelper(verb, verbs, nextIndex, richSentence);
@@ -110,7 +112,7 @@ public class BaseEmiter implements TripletEmiter {
                 verbFound = true;
             if (verbFound && taggedWord.tag().equals(Tag.NC.name()))
                 nouns.add(taggedWord.word());
-            if (Tag.CC.name().equals(taggedWord.tag()) && !nouns.isEmpty()){
+            if (punc_cc_Helper(taggedWord) && !nouns.isEmpty()){ //if (Tag.CC.name().equals(taggedWord.tag()) && !nouns.isEmpty()){
                 complements.add(String.join(" ", nouns));
                 nouns.clear();
             }
@@ -118,6 +120,16 @@ public class BaseEmiter implements TripletEmiter {
 
         complements.add(String.join(" ", nouns));
         return complements;
+    }
+
+    private boolean punc_cc_Helper(TaggedWord taggedWord){
+        boolean result = false;
+        if(Tag.CC.name().equals(taggedWord.tag()))
+            result = true;
+        else if(Tag.PUNC.name().equals(taggedWord.tag()) && ",".equals(taggedWord.word())){
+            result = true;
+        }
+        return result;
     }
 
     @Override

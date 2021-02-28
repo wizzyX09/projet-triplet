@@ -1,4 +1,4 @@
-package ht.kreyola.kreyolaparser.model;
+package ht.kreyola.kreyolaparser.contants;
 
 public enum Delimiters {
     PIPE("|"), SPACE("\\\\s+"), DOT("\\.");

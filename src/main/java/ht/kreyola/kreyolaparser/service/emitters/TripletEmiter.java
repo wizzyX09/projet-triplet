@@ -1,4 +1,4 @@
-package ht.kreyola.kreyolaparser.service;
+package ht.kreyola.kreyolaparser.service.emitters;
 
 import ht.kreyola.kreyolaparser.model.RichSentence;
 import ht.kreyola.kreyolaparser.model.Triplet;

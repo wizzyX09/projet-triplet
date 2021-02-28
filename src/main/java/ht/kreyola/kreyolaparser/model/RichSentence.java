@@ -1,6 +1,7 @@
 package ht.kreyola.kreyolaparser.model;
 
 import edu.stanford.nlp.ling.TaggedWord;
+import ht.kreyola.kreyolaparser.contants.SentenceStatus;
 
 import java.util.List;
 

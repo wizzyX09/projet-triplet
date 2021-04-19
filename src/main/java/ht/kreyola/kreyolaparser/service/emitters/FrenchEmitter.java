@@ -4,6 +4,7 @@ import edu.stanford.nlp.ling.TaggedWord;
 import ht.kreyola.kreyolaparser.contants.FrenchTag;
 import ht.kreyola.kreyolaparser.model.RichSentence;
 import ht.kreyola.kreyolaparser.contants.SentenceStatus;
+import ht.kreyola.kreyolaparser.model.SubVerbComp;
 import ht.kreyola.kreyolaparser.model.Triplet;
 
 import java.util.*;
@@ -14,6 +15,8 @@ import static org.springframework.util.StringUtils.isEmpty;
 
 public class FrenchEmitter implements TripletEmiter {
 
+    private List<SubVerbComp> subVerbCompList = new ArrayList<>();
+
     private String subject(RichSentence richSentence) {
         String firstNoun = null;
         String verb = null;
@@ -21,10 +24,12 @@ public class FrenchEmitter implements TripletEmiter {
             String tag = taggedWord.tag();
             if (FrenchTag.NC.name().equals(tag) || FrenchTag.NPP.name().equals(tag) || FrenchTag.N.name().equals(tag)) {
                 firstNoun = taggedWord.word();
+                subVerbCompList.add(new SubVerbComp(firstNoun));
                 break;
             }
             if (FrenchTag.V.name().equals(tag)) {
                 verb = taggedWord.word();
+                subVerbCompList.get(subVerbCompList.size()-1).getVerbs().add(verb);
                 break;
             }
         }
@@ -52,6 +57,7 @@ public class FrenchEmitter implements TripletEmiter {
         }
 
         verbHelper(verb, verbs, firstVerbIndex, richSentence);
+        subVerbCompList.get(subVerbCompList.size()-1).setVerbs(verbs);
         return verbs;
     }
 
@@ -63,7 +69,10 @@ public class FrenchEmitter implements TripletEmiter {
         } else if (verbInf.substring(verbInfLength - 2).equalsIgnoreCase("ir")) {
             verb = verbInf.substring(0, verbInfLength - 1).concat("t");
         } else if (verbInf.substring(verbInfLength - 2).equalsIgnoreCase("re")) {
-            verb = verbInf.substring(0, verbInfLength - 2);
+            if(!verbInf.equalsIgnoreCase("enregistre"))
+                verb = verbInf.substring(0, verbInfLength - 2);
+            else
+                verb=verbInf;
         } else if (verbInf.substring(verbInfLength - 2).equalsIgnoreCase("er")) {
             verb = verbInf.substring(0, verbInfLength - 1);
         } else {
@@ -108,6 +117,8 @@ public class FrenchEmitter implements TripletEmiter {
     private List<String> complement(RichSentence richSentence) {
         boolean verbFound = false;
         List<String> complements = new ArrayList<>();
+        List<String> complements1 = new ArrayList<>();
+
         List<String> nouns = new ArrayList<>();
         for (TaggedWord taggedWord : richSentence.getTaggedWords()) {
             if (FrenchTag.V.name().equals(taggedWord.tag()))
@@ -116,11 +127,28 @@ public class FrenchEmitter implements TripletEmiter {
                 nouns.add(taggedWord.word());
             if (puncHelper(taggedWord) && !nouns.isEmpty()) { //if (FrenchTag.CC.name().equals(taggedWord.tag()) && !nouns.isEmpty()){
                 complements.add(String.join(" ", nouns));
+                complements1.add(String.join(" ", nouns));
+
                 nouns.clear();
+            }
+            if (verbFound && taggedWord.tag().equals(FrenchTag.V.name()))
+            {
+                subVerbCompList.get(subVerbCompList.size()-1).setComps(complements1);
+                //subVerbCompList.get(subVerbCompList.size()-1).getComps().add(complements1.toString());
+                subVerbCompList.add(new SubVerbComp(subVerbCompList.get(subVerbCompList.size()-1).getSubject()));
+                // verb(richSentence);
+                subVerbCompList.get(subVerbCompList.size()-1).getVerbs().add(taggedWord.word()) ;
+
+
+                complements1.clear();
+
             }
         }
 
         complements.add(String.join(" ", nouns));
+        complements1.add(String.join(" ", nouns));
+
+        subVerbCompList.get(subVerbCompList.size()-1).setComps(complements1);
         return complements;
     }
 
@@ -136,9 +164,15 @@ public class FrenchEmitter implements TripletEmiter {
 
     @Override
     public List<Triplet> emit(RichSentence richSentence) {
+
+
         String subject = subject(richSentence);
         List<String> verbs = verb(richSentence);
         List<String> complements = complement(richSentence);
+
+        for (SubVerbComp subVerbComp: subVerbCompList){
+            System.out.println(subVerbComp);
+        }
         List<Triplet> results = new ArrayList<>();
 
         if (!isEmpty(subject) && !verbs.isEmpty() && !complements.isEmpty()) {
@@ -151,6 +185,8 @@ public class FrenchEmitter implements TripletEmiter {
                     results.add(new Triplet(uuid(), subject, verb, complements.get(1), getOperationType(verb)));
                 }
             }
+
+
 
             return results;
         }
